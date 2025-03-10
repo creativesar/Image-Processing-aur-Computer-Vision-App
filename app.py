@@ -1,5 +1,9 @@
 import streamlit as st
-import cv2
+try:
+    import cv2
+except ImportError:
+    st.error("OpenCV (cv2) is not installed. Please run: pip install opencv-python-headless")
+    st.stop()
 import numpy as np
 from PIL import Image
 import io
