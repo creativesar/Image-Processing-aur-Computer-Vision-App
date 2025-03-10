@@ -29,18 +29,22 @@ def main():
             # Read the image
             image = Image.open(uploaded_file)
             
+            # Convert image to RGB if it has an alpha channel
+            if image.mode == 'RGBA':
+                image = image.convert('RGB')
+            
             # Convert PIL Image to OpenCV format (numpy array)
             img_array = np.array(image)
             
             # Display original image
             st.subheader("Original Image")
-            st.image(image, caption="Uploaded Image", use_column_width=True)
+            st.image(image, caption="Uploaded Image", use_container_width=True)
             
             # Process the image based on selected option
             if processing_option == "Grayscale Conversion":
                 processed_img = process_grayscale(img_array)
                 st.subheader("Grayscale Image")
-                st.image(processed_img, caption="Grayscale Image", use_column_width=True)
+                st.image(processed_img, caption="Grayscale Image", use_container_width=True)
                 
                 # Download button for processed image
                 if st.button("Download Grayscale Image"):
@@ -49,7 +53,7 @@ def main():
             else:  # Object Detection
                 result_img = detect_objects(img_array)
                 st.subheader("Object Detection Result")
-                st.image(result_img, caption="Detected Objects", use_column_width=True)
+                st.image(result_img, caption="Detected Objects", use_container_width=True)
                 
                 # Download button for processed image
                 if st.button("Download Detection Result"):
@@ -57,6 +61,9 @@ def main():
                 
         except Exception as e:
             st.error(f"Error processing image: {e}")
+            # Add more detailed error information for debugging
+            import traceback
+            st.error(traceback.format_exc())
 
 def process_grayscale(image):
     """Convert image to grayscale"""
