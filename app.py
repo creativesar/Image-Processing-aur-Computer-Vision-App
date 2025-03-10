@@ -87,21 +87,55 @@ def main():
             
             # In the main function, update the gender detection results display
             else:  # Gender Detection
-                result_img, gender_results = detect_gender(img_array)
-                st.subheader("Gender and Emotion Detection Result")
+ha                 result_img, gender_results = detect_gender(img_array)
+                st.subheader("Person Analysis Result")
                 st.image(result_img, caption="Detected Persons", use_container_width=True)
                 
-                # Display gender and emotion detection results
+                # Display comprehensive detection results
                 if gender_results:
                     st.subheader("Detected Persons")
-                    for i, (gender, emotion, conf, bbox) in enumerate(gender_results):
-                        st.write(f"{i+1}. {gender} - Emotion: {emotion} (Confidence: {conf:.2f})")
+                    
+                    # Create a table for better visualization
+                    data = []
+                    for i, (gender, emotion, age_group, conf, _) in enumerate(gender_results):
+                        data.append({
+                            "Person": i+1,
+                            "Gender": gender,
+                            "Age Group": age_group,
+                            "Emotion": emotion,
+                            "Confidence": f"{conf:.2f}"
+                        })
+                    
+                    st.table(data)
+                    
+                    # Show detailed analysis
+                    st.subheader("Detailed Analysis")
+                    for i, (gender, emotion, age_group, conf, _) in enumerate(gender_results):
+                        with st.expander(f"Person {i+1} Details"):
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.write(f"**Gender:** {gender}")
+                                st.write(f"**Age Group:** {age_group}")
+                            with col2:
+                                st.write(f"**Emotion:** {emotion}")
+                                st.write(f"**Confidence:** {conf:.2f}")
+                            
+                            # Add interpretation
+                            st.write("**Interpretation:**")
+                            if emotion == "Happy/Excited":
+                                st.write("This person appears to be in a positive emotional state.")
+                            elif emotion == "Sad/Tired":
+                                st.write("This person may be experiencing fatigue or negative emotions.")
+                            elif emotion == "Confident":
+                                st.write("This person appears self-assured and composed.")
+                            elif emotion == "Surprised":
+                                st.write("This person appears to be reacting to something unexpected.")
                 else:
                     st.info("No persons detected in the image.")
                 
                 # Download button for processed image
-                if st.button("Download Gender Detection Result"):
-                    download_image(result_img, "gender_detection_result.jpg")
+                if st.button("Download Person Analysis Result"):
+                    download_image(result_img, "person_analysis_result.jpg")
                 
         except Exception as e:
             st.error(f"Error processing image: {e}")
@@ -158,9 +192,8 @@ def download_image(image, filename):
         mime="image/jpeg"
     )
 
-# Fix the typo in the function definition (remove "ein")
 def detect_gender(image):
-    """Detect persons and their gender in the image"""
+    """Detect persons and their gender, age, and emotion in the image"""
     # Load face detection model
     face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
     
@@ -193,6 +226,7 @@ def detect_gender(image):
             # Determine gender based on face detection within person bounding box
             gender = "Unknown"
             emotion = "Neutral"
+            age_group = "Unknown"
             max_face_area = 0
             
             for (fx, fy, fw, fh) in faces:
@@ -202,36 +236,93 @@ def detect_gender(image):
                     if face_area > max_face_area:
                         max_face_area = face_area
                         
+                        # Extract the face ROI for analysis
+                        face_roi = gray[fy:fy+fh, fx:fx+fw]
+                        color_face_roi = image[fy:fy+fh, fx:fx+fw]
+                        
                         # Simple gender classification based on face width-to-height ratio
                         ratio = fw / fh
-                        if ratio > 0.78:  # Arbitrary threshold
+                        if ratio > 0.78:
                             gender = "Male"
                         else:
                             gender = "Female"
                         
-                        # Extract the face ROI for emotion analysis
-                        face_roi = gray[fy:fy+fh, fx:fx+fw]
-                        
-                        # Simple emotion detection based on pixel intensity variance
-                        # This is a very simplified approach - in a real app you'd use a trained model
+                        # Improved emotion detection based on pixel intensity patterns
                         if face_roi.size > 0:
+                            # Calculate various metrics for emotion detection
                             variance = np.var(face_roi)
-                            if variance > 2000:
+                            mean = np.mean(face_roi)
+                            std_dev = np.std(face_roi)
+                            
+                            # Edge detection for facial features
+                            edges = cv2.Canny(face_roi, 100, 200)
+                            edge_count = np.count_nonzero(edges)
+                            
+                            # Determine emotion based on multiple factors
+                            if edge_count > (fw * fh * 0.15) and variance > 1800:
                                 emotion = "Happy/Excited"
-                            elif variance > 1000:
-                                emotion = "Confident"
-                            elif variance < 500:
+                            elif edge_count < (fw * fh * 0.08) and mean < 100:
                                 emotion = "Sad/Tired"
-                            else:
+                            elif std_dev > 50 and variance > 1500:
+                                emotion = "Surprised"
+                            elif variance > 1200 and mean > 120:
+                                emotion = "Confident"
+                            elif variance < 800:
                                 emotion = "Neutral"
+                            else:
+                                emotion = "Thoughtful"
+                        
+                        # Age estimation based on face texture and proportions
+                        if face_roi.size > 0:
+                            # Apply Gabor filter for wrinkle detection
+                            ksize = 31
+                            sigma = 3.0
+                            theta = 0
+                            lambd = 10.0
+                            gamma = 0.5
+                            
+                            kernel = cv2.getGaborKernel((ksize, ksize), sigma, theta, lambd, gamma, 0, ktype=cv2.CV_32F)
+                            filtered = cv2.filter2D(face_roi, cv2.CV_8UC3, kernel)
+                            
+                            # Calculate texture metrics
+                            texture_variance = np.var(filtered)
+                            
+                            # Estimate age based on texture and face proportions
+                            if texture_variance < 500 and ratio > 0.85:
+                                age_group = "Child (0-12)"
+                            elif texture_variance < 1000 and ratio > 0.8:
+                                age_group = "Teen (13-19)"
+                            elif texture_variance < 1500:
+                                age_group = "Young Adult (20-35)"
+                            elif texture_variance < 2500:
+                                age_group = "Adult (36-50)"
+                            else:
+                                age_group = "Senior (51+)"
             
-            # Draw bounding box with gender and emotion label
-            color = (0, 255, 0) if gender == "Male" else (255, 0, 0)
+            # Draw bounding box with comprehensive information
+            if gender == "Male":
+                color = (0, 255, 0)  # Green for male
+            elif gender == "Female":
+                color = (255, 0, 0)  # Red for female
+            else:
+                color = (0, 165, 255)  # Orange for unknown
+                
             cv2.rectangle(img_copy, (x1, y1), (x2, y2), color, 2)
-            cv2.putText(img_copy, f"{gender} ({emotion}) {conf:.2f}", (x1, y1-10), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
             
-            gender_results.append((gender, emotion, conf, (x1, y1, x2, y2)))
+            # Add text with person information
+            label = f"{gender}, {age_group}"
+            cv2.putText(img_copy, label, (x1, y1-10), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+            
+            # Add emotion on second line
+            cv2.putText(img_copy, f"Emotion: {emotion}", (x1, y1+y2-y1+20), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+            
+            # Add confidence score
+            cv2.putText(img_copy, f"Conf: {conf:.2f}", (x1, y1+y2-y1+40), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+            
+            gender_results.append((gender, emotion, age_group, conf, (x1, y1, x2, y2)))
     
     return img_copy, gender_results
 
