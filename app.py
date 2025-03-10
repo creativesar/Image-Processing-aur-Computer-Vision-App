@@ -78,64 +78,71 @@ def main():
                     st.subheader("Detected Objects")
                     for i, (cls, conf) in enumerate(detection_results):
                         st.write(f"{i+1}. {cls} (Confidence: {conf:.2f})")
-                # Fix the syntax error in line 90 and add business activity detection
-                else:  # Gender Detection
-                    result_img, gender_results = detect_gender(img_array)
-                    st.subheader("Person Analysis Result")
-                    st.image(result_img, caption="Detected Persons", use_container_width=True)
+                else:
+                    st.info("No objects detected with the current confidence threshold.")
+                
+                # Download button for processed image
+                if st.button("Download Detection Result"):
+                    download_image(result_img, "detection_result.jpg")
+            
+            # Gender Detection option (this was incorrectly indented)
+            elif processing_option == "Gender Detection":
+                result_img, gender_results = detect_gender(img_array)
+                st.subheader("Person Analysis Result")
+                st.image(result_img, caption="Detected Persons", use_container_width=True)
+                
+                # Display comprehensive detection results
+                if gender_results:
+                    st.subheader("Detected Persons")
                     
-                    # Display comprehensive detection results
-                    if gender_results:
-                        st.subheader("Detected Persons")
-                        
-                        # Create a table for better visualization
-                        data = []
-                        for i, (gender, emotion, age_group, activity, conf, _) in enumerate(gender_results):
-                            data.append({
-                                "Person": i+1,
-                                "Gender": gender,
-                                "Age Group": age_group,
-                                "Emotion": emotion,
-                                "Activity": activity,
-                                "Confidence": f"{conf:.2f}"
-                            })
-                        
-                        st.table(data)
-                        
-                        # Show detailed analysis
-                        st.subheader("Detailed Analysis")
-                        for i, (gender, emotion, age_group, activity, conf, _) in enumerate(gender_results):
-                            with st.expander(f"Person {i+1} Details"):
-                                col1, col2 = st.columns(2)
-                                with col1:
-                                    st.write(f"**Gender:** {gender}")
-                                    st.write(f"**Age Group:** {age_group}")
-                                with col2:
-                                    st.write(f"**Emotion:** {emotion}")
-                                    st.write(f"**Confidence:** {conf:.2f}")
-                                
-                                st.write(f"**Detected Activity:** {activity}")
-                                
-                                # Add interpretation
-                                st.write("**Interpretation:**")
-                                if emotion == "Happy/Excited":
-                                    st.write("This person appears to be in a positive emotional state.")
-                                elif emotion == "Sad/Tired":
-                                    st.write("This person may be experiencing fatigue or negative emotions.")
-                                elif emotion == "Confident":
-                                    st.write("This person appears self-assured and composed.")
-                                elif emotion == "Surprised":
-                                    st.write("This person appears to be reacting to something unexpected.")
-                                
-                                # Add business context interpretation
-                                if "Business Meeting" in activity:
-                                    st.write("**Business Context:** This person appears to be engaged in a formal business discussion.")
-                                elif "Handshake" in activity:
-                                    st.write("**Business Context:** This person may be concluding a business deal or greeting someone formally.")
-                                elif "Presentation" in activity:
-                                    st.write("**Business Context:** This person appears to be presenting information in a professional setting.")
-                                elif "Negotiation" in activity:
-                                    st.write("**Business Context:** This person seems to be in a negotiation process.")
+                    # Create a table for better visualization
+                    data = []
+                    for i, (gender, emotion, age_group, activity, conf, _) in enumerate(gender_results):
+                        data.append({
+                            "Person": i+1,
+                            "Gender": gender,
+                            "Age Group": age_group,
+                            "Emotion": emotion,
+                            "Activity": activity,
+                            "Confidence": f"{conf:.2f}"
+                        })
+                    
+                    st.table(data)
+                    
+                    # Show detailed analysis
+                    st.subheader("Detailed Analysis")
+                    for i, (gender, emotion, age_group, activity, conf, _) in enumerate(gender_results):
+                        with st.expander(f"Person {i+1} Details"):
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.write(f"**Gender:** {gender}")
+                                st.write(f"**Age Group:** {age_group}")
+                            with col2:
+                                st.write(f"**Emotion:** {emotion}")
+                                st.write(f"**Confidence:** {conf:.2f}")
+                            
+                            st.write(f"**Detected Activity:** {activity}")
+                            
+                            # Add interpretation
+                            st.write("**Interpretation:**")
+                            if emotion == "Happy/Excited":
+                                st.write("This person appears to be in a positive emotional state.")
+                            elif emotion == "Sad/Tired":
+                                st.write("This person may be experiencing fatigue or negative emotions.")
+                            elif emotion == "Confident":
+                                st.write("This person appears self-assured and composed.")
+                            elif emotion == "Surprised":
+                                st.write("This person appears to be reacting to something unexpected.")
+                            
+                            # Add business context interpretation
+                            if "Business Meeting" in activity:
+                                st.write("**Business Context:** This person appears to be engaged in a formal business discussion.")
+                            elif "Handshake" in activity:
+                                st.write("**Business Context:** This person may be concluding a business deal or greeting someone formally.")
+                            elif "Presentation" in activity:
+                                st.write("**Business Context:** This person appears to be presenting information in a professional setting.")
+                            elif "Negotiation" in activity:
+                                st.write("**Business Context:** This person seems to be in a negotiation process.")
                 else:
                     st.info("No persons detected in the image.")
                 
