@@ -73,11 +73,37 @@ def main():
                 st.subheader("Object Detection Result")
                 st.image(result_img, caption="Detected Objects", use_container_width=True)
                 
-                # Display detection results
+                # Display detection results in a more organized way
                 if detection_results:
                     st.subheader("Detected Objects")
-                    for i, (cls, conf) in enumerate(detection_results):
-                        st.write(f"{i+1}. {cls} (Confidence: {conf:.2f})")
+                    
+                    # Convert results to DataFrame for better display
+                    import pandas as pd
+                    df = pd.DataFrame(detection_results, columns=['Object', 'Confidence'])
+                    
+                    # Add count of each object type
+                    object_counts = df['Object'].value_counts()
+                    st.write("**Object Count Summary:**")
+                    for obj, count in object_counts.items():
+                        st.write(f"- {obj}: {count}")
+                    
+                    # Show detailed results in a sortable table
+                    st.write("\n**Detailed Detection Results:**")
+                    df['Confidence'] = df['Confidence'].round(3)
+                    st.dataframe(df.sort_values('Confidence', ascending=False))
+                    
+                    # Add filtering option
+                    min_conf = st.slider(
+                        "Filter by minimum confidence",
+                        min_value=float(df['Confidence'].min()),
+                        max_value=float(df['Confidence'].max()),
+                        value=float(df['Confidence'].min()),
+                        step=0.05
+                    )
+                    filtered_df = df[df['Confidence'] >= min_conf]
+                    if not filtered_df.empty:
+                        st.write("**Filtered Results:**")
+                        st.dataframe(filtered_df)
                 else:
                     st.info("No objects detected with the current confidence threshold.")
                 
