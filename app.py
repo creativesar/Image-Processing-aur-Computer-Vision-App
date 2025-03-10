@@ -21,7 +21,7 @@ def main():
     # Processing options
     processing_option = st.radio(
         "Select Processing Option",
-        ["Grayscale Conversion", "Object Detection"]
+        ["Grayscale Conversion", "Object Detection", "Gender Detection"]
     )
     
     # Add model selection and confidence threshold for object detection
@@ -68,7 +68,7 @@ def main():
                 if st.button("Download Grayscale Image"):
                     download_image(processed_img, "grayscale_image.jpg")
                 
-            else:  # Object Detection
+            elif processing_option == "Object Detection":
                 result_img, detection_results = detect_objects(img_array, model_option, confidence_threshold)
                 st.subheader("Object Detection Result")
                 st.image(result_img, caption="Detected Objects", use_container_width=True)
@@ -84,6 +84,24 @@ def main():
                 # Download button for processed image
                 if st.button("Download Detection Result"):
                     download_image(result_img, "detection_result.jpg")
+            
+            # In the main function, update the gender detection results display
+            else:  # Gender Detection
+                result_img, gender_results = detect_gender(img_array)
+                st.subheader("Gender and Emotion Detection Result")
+                st.image(result_img, caption="Detected Persons", use_container_width=True)
+                
+                # Display gender and emotion detection results
+                if gender_results:
+                    st.subheader("Detected Persons")
+                    for i, (gender, emotion, conf, bbox) in enumerate(gender_results):
+                        st.write(f"{i+1}. {gender} - Emotion: {emotion} (Confidence: {conf:.2f})")
+                else:
+                    st.info("No persons detected in the image.")
+                
+                # Download button for processed image
+                if st.button("Download Gender Detection Result"):
+                    download_image(result_img, "gender_detection_result.jpg")
                 
         except Exception as e:
             st.error(f"Error processing image: {e}")
@@ -139,6 +157,83 @@ def download_image(image, filename):
         file_name=filename,
         mime="image/jpeg"
     )
+
+# Fix the typo in the function definition (remove "ein")
+def detect_gender(image):
+    """Detect persons and their gender in the image"""
+    # Load face detection model
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    
+    # Load YOLO model for person detection
+    model = YOLO("yolov8n.pt")
+    
+    # Make a copy of the image for drawing
+    img_copy = image.copy()
+    
+    # Convert to grayscale for face detection
+    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    
+    # Detect faces
+    faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+    
+    # Use YOLO to detect persons
+    results = model(image, classes=[0])  # Class 0 is person in COCO dataset
+    
+    # Extract gender detection results
+    gender_results = []
+    
+    # Process YOLO results
+    for result in results:
+        boxes = result.boxes
+        for box in boxes:
+            # Get bounding box coordinates
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            conf = float(box.conf)
+            
+            # Determine gender based on face detection within person bounding box
+            gender = "Unknown"
+            emotion = "Neutral"
+            max_face_area = 0
+            
+            for (fx, fy, fw, fh) in faces:
+                # Check if face is within this person bounding box
+                if (fx > x1 and fy > y1 and fx + fw < x2 and fy + fh < y2):
+                    face_area = fw * fh
+                    if face_area > max_face_area:
+                        max_face_area = face_area
+                        
+                        # Simple gender classification based on face width-to-height ratio
+                        ratio = fw / fh
+                        if ratio > 0.78:  # Arbitrary threshold
+                            gender = "Male"
+                        else:
+                            gender = "Female"
+                        
+                        # Extract the face ROI for emotion analysis
+                        face_roi = gray[fy:fy+fh, fx:fx+fw]
+                        
+                        # Simple emotion detection based on pixel intensity variance
+                        # This is a very simplified approach - in a real app you'd use a trained model
+                        if face_roi.size > 0:
+                            variance = np.var(face_roi)
+                            if variance > 2000:
+                                emotion = "Happy/Excited"
+                            elif variance > 1000:
+                                emotion = "Confident"
+                            elif variance < 500:
+                                emotion = "Sad/Tired"
+                            else:
+                                emotion = "Neutral"
+            
+            # Draw bounding box with gender and emotion label
+            color = (0, 255, 0) if gender == "Male" else (255, 0, 0)
+            cv2.rectangle(img_copy, (x1, y1), (x2, y2), color, 2)
+            cv2.putText(img_copy, f"{gender} ({emotion}) {conf:.2f}", (x1, y1-10), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+            
+            gender_results.append((gender, emotion, conf, (x1, y1, x2, y2)))
+    
+    return img_copy, gender_results
 
 if __name__ == "__main__":
     main()
