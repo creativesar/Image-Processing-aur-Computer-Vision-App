@@ -192,11 +192,15 @@ def detect_objects(image, model_name="yolov8n.pt", conf_threshold=0.25):
     # Load YOLO model
     model = YOLO(model_name)
     
-    # Run inference with lower confidence threshold to detect more objects
-    results = model(image, conf=conf_threshold)
+    # Create color mapping for different classes
+    import random
+    class_colors = {}
     
-    # Get the result with annotations
-    annotated_img = results[0].plot()
+    # Run inference with lower confidence threshold to detect more objects
+    results = model(image)
+    
+    # Make a copy of the image for drawing
+    img_copy = image.copy()
     
     # Extract detection results for display
     detection_results = []
@@ -205,9 +209,30 @@ def detect_objects(image, model_name="yolov8n.pt", conf_threshold=0.25):
         for box in boxes:
             cls = result.names[int(box.cls)]
             conf = float(box.conf)
+            
+            # Generate and store consistent colors for each class
+            if cls not in class_colors:
+                class_colors[cls] = (
+                    random.randint(0, 255),
+                    random.randint(0, 255),
+                    random.randint(0, 255)
+                )
+            
+            # Get box coordinates
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            
+            # Draw colored rectangle and label
+            color = class_colors[cls]
+            cv2.rectangle(img_copy, (x1, y1), (x2, y2), color, 2)
+            
+            # Add label with confidence
+            label = f"{cls} {conf:.2f}"
+            cv2.putText(img_copy, label, (x1, y1-10), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
+            
             detection_results.append((cls, conf))
     
-    return annotated_img, detection_results
+    return img_copy, detection_results
 
 def download_image(image, filename):
     """Allow users to download the processed image"""
