@@ -24,6 +24,24 @@ def main():
         ["Grayscale Conversion", "Object Detection"]
     )
     
+    # Add model selection and confidence threshold for object detection
+    if processing_option == "Object Detection":
+        col1, col2 = st.columns(2)
+        with col1:
+            model_option = st.selectbox(
+                "Select YOLO Model",
+                ["yolov8n.pt", "yolov8s.pt", "yolov8m.pt", "yolov8l.pt", "yolov8x.pt"],
+                index=0
+            )
+        with col2:
+            confidence_threshold = st.slider(
+                "Confidence Threshold",
+                min_value=0.1,
+                max_value=0.9,
+                value=0.25,
+                step=0.05
+            )
+    
     if uploaded_file is not None:
         try:
             # Read the image
@@ -51,9 +69,17 @@ def main():
                     download_image(processed_img, "grayscale_image.jpg")
                 
             else:  # Object Detection
-                result_img = detect_objects(img_array)
+                result_img, detection_results = detect_objects(img_array, model_option, confidence_threshold)
                 st.subheader("Object Detection Result")
                 st.image(result_img, caption="Detected Objects", use_container_width=True)
+                
+                # Display detection results
+                if detection_results:
+                    st.subheader("Detected Objects")
+                    for i, (cls, conf) in enumerate(detection_results):
+                        st.write(f"{i+1}. {cls} (Confidence: {conf:.2f})")
+                else:
+                    st.info("No objects detected with the current confidence threshold.")
                 
                 # Download button for processed image
                 if st.button("Download Detection Result"):
@@ -70,18 +96,27 @@ def process_grayscale(image):
     gray_image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     return gray_image
 
-def detect_objects(image):
+def detect_objects(image, model_name="yolov8n.pt", conf_threshold=0.25):
     """Detect objects in the image using YOLO"""
     # Load YOLO model
-    model = YOLO("yolov8n.pt")
+    model = YOLO(model_name)
     
-    # Run inference
-    results = model(image)
+    # Run inference with lower confidence threshold to detect more objects
+    results = model(image, conf=conf_threshold)
     
     # Get the result with annotations
     annotated_img = results[0].plot()
     
-    return annotated_img
+    # Extract detection results for display
+    detection_results = []
+    for result in results:
+        boxes = result.boxes
+        for box in boxes:
+            cls = result.names[int(box.cls)]
+            conf = float(box.conf)
+            detection_results.append((cls, conf))
+    
+    return annotated_img, detection_results
 
 def download_image(image, filename):
     """Allow users to download the processed image"""
