@@ -189,12 +189,16 @@ def process_grayscale(image):
 
 def detect_objects(image, model_name="yolov8n.pt", conf_threshold=0.25):
     """Detect objects in the image using YOLO"""
-    # Load YOLO model
+    # Load YOLO model and face detection cascade
     model = YOLO(model_name)
+    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
     
     # Create color mapping for different classes
     import random
     class_colors = {}
+    
+    # Convert to grayscale for face detection
+    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
     
     # Run inference with lower confidence threshold to detect more objects
     results = model(image)
@@ -221,8 +225,35 @@ def detect_objects(image, model_name="yolov8n.pt", conf_threshold=0.25):
             # Get box coordinates
             x1, y1, x2, y2 = map(int, box.xyxy[0])
             
+            # Special handling for person detection
+            if cls == "person":
+                # Detect faces within person bounding box
+                roi_gray = gray[y1:y2, x1:x2]
+                faces = face_cascade.detectMultiScale(roi_gray, 1.1, 4)
+                
+                age_group = "Unknown"
+                for (fx, fy, fw, fh) in faces:
+                    face_roi = roi_gray[fy:fy+fh, fx:fx+fw]
+                    
+                    if face_roi.size > 0:
+                        # Calculate texture features for age estimation
+                        variance = np.var(face_roi)
+                        mean = np.mean(face_roi)
+                        
+                        # Simple age estimation based on face texture
+                        if variance < 500:
+                            age_group = "Child"
+                        elif variance < 1000:
+                            age_group = "Young"
+                        elif variance < 2000:
+                            age_group = "Adult"
+                        else:
+                            age_group = "Senior"
+                
+                cls = f"{cls} ({age_group})"
+            
             # Draw colored rectangle and label
-            color = class_colors[cls]
+            color = class_colors[cls.split(' ')[0]]  # Use base class for color
             cv2.rectangle(img_copy, (x1, y1), (x2, y2), color, 2)
             
             # Add label with confidence
@@ -230,9 +261,34 @@ def detect_objects(image, model_name="yolov8n.pt", conf_threshold=0.25):
             cv2.putText(img_copy, label, (x1, y1-10), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
             
+            # Add scene context for person detections
+            if "person" in cls.lower():
+                context = analyze_scene_context(image[y1:y2, x1:x2])
+                cv2.putText(img_copy, context, (x1, y2+20), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+            
             detection_results.append((cls, conf))
     
     return img_copy, detection_results
+
+def analyze_scene_context(person_roi):
+    """Analyze the context around a detected person"""
+    # Calculate color histogram
+    hist = cv2.calcHist([person_roi], [0, 1, 2], None, [8, 8, 8], [0, 256, 0, 256, 0, 256])
+    hist = cv2.normalize(hist, hist).flatten()
+    
+    # Simple context analysis based on color distribution
+    dominant_colors = np.argsort(hist)[-3:]
+    
+    # Basic context determination
+    if np.mean(person_roi) < 50:  # Dark scene
+        return "Indoor/Dark"
+    elif np.mean(person_roi) > 200:  # Bright scene
+        return "Outdoor/Bright"
+    elif np.std(person_roi) > 50:  # High variation
+        return "Complex Scene"
+    else:
+        return "Normal Lighting"
 
 def download_image(image, filename):
     """Allow users to download the processed image"""
